@@ -1,0 +1,223 @@
+plugins:
+  role: primary
+  message:
+    - digest
+    - mac
+    - checkpoint
+  transition:
+    - checkpoint
+  pipeline: direct
+
+protocol:
+  general:
+    leader: stable
+    request-target: primary
+
+  roles:
+    - primary
+    - nodes
+    - client
+    
+  phases:
+    - name: normal
+      states:
+        - idle
+        - wait_sign_share
+        - wait_sign_share_slow
+        - wait_full_commit_or_prepare
+        - wait_commit
+        - wait_full_commit
+        - executed
+      messages:
+        - name: request
+          request-block: true
+        - name: reply
+          request-block: true
+        - name: preprepare
+          request-block: true
+        - sign_share
+        - prepare
+        - commit
+        - full-commit-proof
+
+    - name: view_change
+      states:
+        - wait_view_change
+        - wait_new_view
+      messages:
+        - view_change
+        - new_view
+        - checkpoint
+
+  transitions:
+    from:
+      - role: client
+        state: idle
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: reply
+              quorum: f + 1
+
+      - role: primary
+        state: idle
+        to:
+          - state: wait_sign_share
+            condition:
+              type: message
+              message: request
+              quorum: 1
+            response:
+              - target: nodes
+                message: preprepare
+            extra_tally:
+              - role: primary
+                message: sign_share
+
+      - role: nodes
+        state: idle
+        to:
+          - state: wait_full_commit_or_prepare
+            condition:
+              type: message
+              message: preprepare
+              quorum: 1
+            response:
+              - target: primary
+                message: sign_share
+
+      - role: primary
+        state: wait_sign_share
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: sign_share
+              quorum: 3f + 1
+            response:
+              - target: nodes
+                message: full-commit-proof
+              - target: client
+                message: reply
+          - state: wait_sign_share_slow
+            condition:
+              type: timeout
+              mode: state
+            extra_tally:
+              - role: primary
+                message: commit
+
+      - role: primary
+        state: wait_sign_share_slow
+        to:
+          - state: wait_commit
+            update: slow
+            condition:
+              type: message
+              message: sign_share
+              quorum: 2f + 1
+            response:
+              - target: nodes
+                message: prepare
+
+      - role: nodes
+        state: wait_full_commit_or_prepare
+        to:
+          - state: wait_full_commit
+            update: slow
+            condition:
+              type: message
+              message: prepare
+              quorum: 1
+            response:
+              - target: primary
+                message: commit
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: full-commit-proof
+              quorum: 1
+            response:
+              - target: client
+                message: reply
+          # view-change
+          # - state: wait_view_change
+          #   update: view
+          #   condition:
+          #     type: timeout
+          #     mode: sequence
+          #   response:
+          #     - target: nodes
+          #       message: view_change
+
+      - role: primary
+        state: wait_commit
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: commit
+              quorum: 2f + 1
+            response:
+              - target: nodes
+                message: full-commit-proof
+              - target: client
+                message: reply
+
+      - role: nodes
+        state: wait_full_commit
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: full-commit-proof
+              quorum: 1
+            response:
+              - target: client
+                message: reply
+
+      # view-change
+      # - role: nodes
+      #   state: wait_view_change
+      #   to:
+      #     - state: wait_new_view
+      #       condition:
+      #         type: message
+      #         message: view_change
+      #         quorum: 2f + 1
+
+      # - role: primary
+      #   state: wait_new_view
+      #   to:
+      #     - state: executed
+      #       update: sequence
+      #       response:
+      #         - target: nodes
+      #           message: new_view
+      #         - target: client
+      #           message: reply
+
+      # - role: nodes
+      #   state: wait_new_view
+      #   to:
+      #     - state: executed
+      #       update: sequence
+      #       condition:
+      #         type: message
+      #         message: new_view
+      #         quorum: 1
+      #       response:
+      #         - target: client
+      #           message: reply
+      #     - state: wait_new_view
+      #       update: view
+      #       condition:
+      #         type: timeout
+      #         mode: state
+              

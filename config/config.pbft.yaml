@@ -1,0 +1,172 @@
+plugins:
+  role: primary
+  message:
+    - digest
+    - mac
+    - read-only
+    - checkpoint
+    - learning
+  transition:
+    - checkpoint
+  pipeline: direct
+
+protocol:
+  general:
+    leader: stable
+    request-target: primary
+
+  roles:
+    - primary
+    - nodes
+    - client
+
+  phases:
+    - name: normal
+      states:
+        - idle
+        - wait_prepare
+        - wait_commit
+        - executed
+      messages:
+        - name: request
+          request-block: true
+        - name: reply
+          request-block: true
+        - name: preprepare
+          request-block: true
+        - prepare
+        - commit
+        - report
+    # - name: view_change
+    #   states:
+    #     - wait_view_change
+    #     - wait_new_view
+    #   messages:
+    #     - view_change
+    #     - new_view
+    - name: checkpoint
+      messages:
+        - checkpoint
+        - fetch
+
+  transitions:
+    from:
+      - role: client
+        state: idle
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: reply
+              quorum: 2f + 1
+
+      - role: primary
+        state: idle
+        to:
+          - state: wait_prepare
+            condition:
+              type: message
+              message: request
+              quorum: 1
+            response:
+              - target: nodes
+                message: preprepare
+            # need this because for primary:
+            # idle -> wait_prepare, it will only send everyone preprepare
+            # But for PBFT it *should* have also send everyone another prepare once received preprepare
+            # Thus here it is compensating itself for its own prepare message
+            extra_tally:
+              - role: primary
+                message: prepare
+
+      - role: nodes
+        state: idle
+        to:
+          - state: wait_prepare
+            condition:
+              type: message
+              message: preprepare
+              quorum: 1
+            response:
+              - target: nodes
+                message: prepare
+            # here every other replica assume they receive another prepare message from primary
+            # once received preprepare from primary
+            # reason is the same
+            extra_tally:
+              - role: primary
+                message: prepare
+
+      - role: nodes
+        state: wait_prepare
+        to:
+          - state: wait_commit
+            condition:
+              type: message
+              message: prepare
+              quorum: 2f + 1
+            response:
+              - target: nodes
+                message: commit
+
+          # - state: wait_view_change
+          #   update: view
+          #   condition:
+          #     type: timeout
+          #     mode: sequence
+          #   response:
+          #     - target: nodes
+          #       message: view_change
+
+      - role: nodes
+        state: wait_commit
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: commit
+              quorum: 2f + 1
+            response:
+              - target: client
+                message: reply
+
+      # view-change
+      # - role: nodes
+      #   state: wait_view_change
+      #   to:
+      #     - state: wait_new_view
+      #       condition:
+      #         type: message
+      #         message: view_change
+      #         quorum: 2f + 1
+
+      # - role: primary
+      #   state: wait_new_view
+      #   to:
+      #     - state: executed
+      #       update: sequence
+      #       response:
+      #         - target: nodes
+      #           message: new_view
+      #         - target: client
+      #           message: reply
+
+      # - role: nodes
+      #   state: wait_new_view
+      #   to:
+      #     - state: executed
+      #       update: sequence
+      #       condition:
+      #         type: message
+      #         message: new_view
+      #         quorum: 1
+      #       response:
+      #         - target: client
+      #           message: reply
+      #     - state: wait_new_view
+      #       update: view
+      #       condition:
+      #         type: timeout
+      #         mode: state

@@ -1,0 +1,1 @@
+cp target/java/com/gbft/framework/data/*.java ../code/src/com/gbft/framework/data/

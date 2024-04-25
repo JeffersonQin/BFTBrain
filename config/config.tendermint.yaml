@@ -1,0 +1,119 @@
+plugins:
+  role: primary
+  message:
+    - nil
+    - digest
+    - mac
+    - checkpoint
+  transition:
+    - checkpoint
+  pipeline: direct
+
+protocol:
+  general:
+    leader: rotate
+    request-target: primary
+
+  roles:
+    - primary
+    - nodes
+    - client
+
+  phases:
+    - name: normal
+      states:
+        - idle
+        - wait_prevote
+        - wait_precommit
+        - executed
+        - any
+      messages:
+        - name: request
+          request-block: true
+        - name: reply
+          request-block: true
+        - name: propose
+          request-block: true
+        - prevote
+        - precommit
+
+    - name: checkpoint
+      messages:
+        - checkpoint
+
+  transitions:
+    from:
+      - role: client
+        state: idle
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: reply
+              quorum: 2f + 1
+
+      - role: primary
+        state: idle
+        to:
+          - state: wait_prevote
+            condition:
+              type: message
+              message: request
+              quorum: 1
+            response:
+              - target: nodes
+                message: propose
+            extra_tally:
+              - role: primary
+                message: prevote
+              
+      - role: nodes
+        state: idle
+        to:
+          - state: wait_prevote
+            condition:
+              type: message
+              message: propose
+              quorum: 1
+            response:
+              - target: nodes
+                message: prevote
+            extra_tally:
+              - role: primary
+                message: prevote
+
+      - role: nodes
+        state: wait_prevote
+        to:
+          - state: wait_precommit
+            condition:
+              type: message
+              message: prevote
+              quorum: 2f + 1
+            response:
+              - target: nodes
+                message: precommit
+
+      - role: nodes
+        state: wait_precommit
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: precommit
+              quorum: 2f + 1
+            response:
+              - target: client
+                message: reply
+
+      - role: nodes
+        state: any
+        to:
+          - state: executed
+            update: view
+            condition:
+              type: view
+              quorum: f + 1
+

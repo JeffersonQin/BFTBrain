@@ -1,0 +1,33 @@
+# everything in ms
+field:
+  advance: true
+  init:
+  delay:
+  fixed:
+    value:
+  uniform:
+    interval:
+    discrete:
+      values:
+        - 1
+        - 2
+      distribution:
+        - 0.6
+        - 0.4
+    continuous:     
+      upper:
+      lower:
+  normal:
+    interval:
+    lower:
+    upper:
+    mean:
+    sigma: 
+  schedule:
+    values:
+      - true
+      - false
+      - true
+    intervals:
+      - 10000
+      - 20000

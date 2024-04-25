@@ -1,0 +1,252 @@
+plugins:
+  role: passive
+  message:
+    - digest
+    - mac
+    - checkpoint
+  transition:
+    - checkpoint
+  pipeline: direct
+
+protocol:
+  # fault-override:
+  #   - in-dark
+
+  general:
+    leader: stable
+    request-target: primary
+
+  roles:
+    - primary
+    - active
+    - passive
+    - nodes
+    - client
+
+  phases:
+    - name: normal
+      states:
+        - idle
+        - wait_commit
+        - client_panic
+        - executed
+      messages:
+        - name: request
+          request-block: true
+        - name: reply
+          request-block: true
+        - name: prepare
+          request-block: true
+        - commit
+        - name: update
+          request-block: true
+
+    # - name: view_change
+    #   states:
+    #     - wait_panic
+    #     - wait_history
+    #     - wait_view_change
+    #     - wait_new_view
+    #   messages:
+    #     - name: panic
+    #       request-block: true
+    #     - history
+    #     - view_change
+    #     - new_view
+
+    - name: checkpoint
+      messages:
+        - checkpoint
+
+  transitions:
+    from:
+      - role: client
+        state: idle
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: reply
+              quorum: f + 1
+          # - state: client_panic
+          #   condition:
+          #     type: timeout
+          #     mode: sequence
+          #   response:
+          #     - target: primary
+          #       message: panic
+
+      # - role: client
+      #   state: client_panic
+      #   to:
+      #     - state: executed
+      #       update: sequence
+      #       condition:
+      #         type: message
+      #         message: reply
+      #         quorum: 2f + 1
+
+      - role: primary
+        state: idle
+        to:
+          - state: wait_commit
+            condition:
+              type: message
+              message: request
+              quorum: 1
+            response:
+              - target: active
+                message: prepare
+            extra_tally:
+              - role: primary
+                message: commit
+
+      - role: active
+        state: idle
+        to:
+          - state: wait_commit
+            condition:
+              type: message
+              message: prepare
+              quorum: 1
+            response:
+              - target: active
+                message: commit
+            extra_tally:
+              - role: primary
+                message: commit
+
+      - role: nodes
+        state: wait_commit
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: commit
+              quorum: f + 1
+            response:
+              - target: client
+                message: reply
+              - target: passive
+                message: update
+
+          # - state: wait_panic
+          #   update: view
+          #   condition:
+          #     type: timeout
+          #     mode: state
+          #   response:
+          #     - target: nodes
+          #       message: panic
+
+      - role: passive
+        state: idle
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: update
+              quorum: f + 1
+
+      # - role: nodes
+      #   state: idle
+      #   to:
+      #     - state: wait_panic
+      #       update: view
+      #       condition:
+      #         type: message
+      #         message: panic
+      #         quorum: 1
+      #       response:
+      #         - target: nodes
+      #           message: panic
+
+      # - role: nodes
+      #   state: wait_commit
+      #   to:
+      #     - state: wait_panic
+      #       update: view
+      #       condition:
+      #         type: message
+      #         message: panic
+      #         quorum: 1
+      #       response:
+      #         - target: nodes
+      #           message: panic
+
+      # - role: primary
+      #   state: wait_panic
+      #   to:
+      #     - state: wait_new_view
+      #       condition:
+      #         type: message
+      #         message: panic
+      #         quorum: 2f + 1
+      #       response:
+      #         - target: nodes
+      #           message: history
+
+      # - role: nodes
+      #   state: wait_panic
+      #   to:
+      #     - state: wait_history
+      #       condition:
+      #         type: message
+      #         message: panic
+      #         quorum: 2f + 1
+
+      # - role: nodes
+      #   state: wait_history
+      #   to:
+      #     - state: wait_view_change
+      #       condition:
+      #         type: message
+      #         message: history
+      #         quorum: 1
+      #       response:
+      #         - target: nodes
+      #           message: view_change
+      #       extra_tally:
+      #         - role: primary
+      #           message: view_change
+
+      # - role: nodes
+      #   state: wait_view_change
+      #   to:
+      #     - state: wait_new_view
+      #       condition:
+      #         type: message
+      #         message: view_change
+      #         quorum: 2f + 1
+
+      # - role: primary
+      #   state: wait_new_view
+      #   to:
+      #     - state: executed
+      #       update: sequence
+      #       response:
+      #         - target: nodes
+      #           message: new_view
+      #         - target: client
+      #           message: reply
+
+      # - role: nodes
+      #   state: wait_new_view
+      #   to:
+      #     - state: executed
+      #       update: sequence
+      #       condition:
+      #         type: message
+      #         message: new_view
+      #         quorum: 1
+      #       response:
+      #         - target: client
+      #           message: reply
+      #     - state: wait_new_view
+      #       update: view
+      #       condition:
+      #         type: timeout
+      #         mode: state

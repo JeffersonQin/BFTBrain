@@ -1,0 +1,126 @@
+plugins:
+  role: primary
+  message:
+    - speculate
+    - digest
+    - mac
+    - read-only
+    - checkpoint
+    - learning
+  transition:
+    - checkpoint
+  pipeline: direct
+
+protocol:
+  general:
+    leader: stable
+    request-target: primary
+
+  roles:
+    - primary
+    - nodes
+    - client
+
+  phases:
+    - name: normal
+      states:
+        - idle
+        - wait_commit
+        - client_wait_all
+        - executed
+      messages:
+        - name: request
+          request-block: true
+        - name: reply
+          request-block: true
+        - name: prepare
+          request-block: true
+        - commit
+        - report
+    - name: checkpoint
+      messages:
+        - checkpoint
+        - fetch
+
+  transitions:
+    from:
+      - role: primary
+        state: idle
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: request
+              quorum: 1
+            response:
+              - target: nodes
+                message: prepare
+              - target: client
+                message: reply
+
+      - role: nodes
+        state: idle
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: prepare
+              quorum: 1
+            response:
+              - target: client
+                message: reply
+
+      - role: client
+        state: idle
+        to:
+          - state: client_wait_all
+            condition:
+              type: message
+              message: reply
+              quorum: 2f + 1
+          # - state: idle
+          #   condition:
+          #     type: timeout
+          #     mode: state
+          #     multiplier: 3
+          #   response:
+          #     - target: nodes
+          #       message: request
+
+      - role: client
+        state: client_wait_all
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: reply
+              quorum: 3f + 1
+          - state: wait_commit
+            condition:
+              type: timeout
+              mode: state
+              multiplier: 3
+            response:
+              - target: nodes
+                message: commit
+      
+      - role: client 
+        state: wait_commit
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: commit
+              quorum: 2f + 1
+          # - state: client_wait_all
+          #   condition:
+          #     type: timeout
+          #     mode: state
+          #     multiplier: 3
+          #   response:
+          #     - target: nodes
+          #       message: request

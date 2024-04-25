@@ -1,0 +1,57 @@
+# workload.contention-level:
+#   - 100
+#   - 10
+#   - 2
+workload.distribution:
+  - - 1
+    - 0
+    - 0
+    - 0
+  - - 0
+    - 1
+    - 0
+    - 0
+  - - 0
+    - 0
+    - 1
+    - 0
+  - - 0
+    - 0
+    - 0
+    - 1
+  - - 0.25
+    - 0.25
+    - 0.25
+    - 0.25
+# workload.read-only-ratio:
+#   - 0
+#   - 0.01
+#   - 0.02
+#   - 0.05
+workload.compute-factor:
+  - 0
+  - 1000
+  - 1000000
+  # - 1000000000
+benchmark.block-size:
+  - 1
+  - 10
+  - 100
+  - 1000
+  - 5000
+workload.payload:
+  - request-size: 4000
+    reply-size: 4000
+  - request-size: 40000
+    reply-size: 40000
+  - request-size: 400000
+    reply-size: 400000
+  - request-size: 4000000
+    reply-size: 4000000
+benchmark.closed-loop.delay-ms:
+  - 0
+  - 10
+  - 20
+  - 50
+  - 100
+  

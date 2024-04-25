@@ -1,0 +1,78 @@
+network:
+  server: 127.0.0.1:9020
+  units:
+    - 127.0.0.1:9021
+    - 127.0.0.1:9022
+    - 127.0.0.1:9023
+    - 127.0.0.1:9024
+general:
+  f: 1
+  max-active-requests: 1000
+  verbosity: v
+  logfile: false # true -> file, false -> stdout
+  learning: false
+  report-sequence: 20000000
+  exchange-sequence: 30000000
+benchmark:
+  block-size: 10
+  checkpoint-size: 100000000
+  catch-up-k: 2
+  request-interval-micros: 100
+  benchmark-interval-ms: 3000
+  timeout: fixed
+  timeout-trigger-interval-ms: 50
+  client: basic
+  closed-loop:
+    enable: true
+    num-client: 100
+    delay-ms: 0
+  leader-rotate-interval: 100
+  aggregation-delay-ms: 100
+workload:
+  # lower for more contention
+  contention-level: 100
+  dataset-size: 100
+  payload:
+    request-size: 4000
+    reply-size: 4000
+  compute-factor: 0
+  distribution:
+    - 1 # 00
+    - 0 # 04
+    - 0 # 40
+    - 0 # 44
+  read-only-ratio: 0
+fault:
+  in-dark:
+    affected-entities:
+      - 2
+    generator:
+      advance: true
+      init: false
+      delay: 3000
+      fixed:
+        value: false
+  timeout:
+    affected-entities:
+      - 2
+    generator:
+      advance: true
+      init: 0
+      delay: 10000
+      fixed:
+        value: 0
+  slow-proposal:
+    # affected entities here are the malicious leaders
+    # instead of victims of malicious leaders
+    affected-entities:
+      - 0
+    attacking: false
+    timer: 100
+switching:
+  protocol-pool:
+    - pbft
+    - zyzzyva
+    - hotstuff
+    - cheapbft
+    - sbft
+    - prime

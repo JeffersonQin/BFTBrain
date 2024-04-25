@@ -1,0 +1,146 @@
+plugins:
+  role: primary
+  message:
+    - digest
+    - mac
+    - checkpoint
+  transition:
+    - checkpoint
+  pipeline: direct
+
+protocol:
+  general:
+    leader: stable
+    request-target: primary
+
+  roles:
+    - primary
+    - nodes
+    - client
+
+  phases:
+    - name: normal
+      states:
+        - idle
+        - wait_accept
+        - executed
+      messages:
+        - name: request
+          request-block: true
+        - name: reply
+          request-block: true
+        - name: propose
+          request-block: true
+        - accept
+    - name: view_change
+      states:
+        - wait_view_change
+        - wait_new_view
+      messages:
+        - view_change
+        - new_view
+    - name: checkpoint
+      messages:
+        - checkpoint
+
+  transitions:
+    from:
+      - role: client
+        state: idle
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: reply
+              quorum: 4f + 1
+
+      - role: primary
+        state: idle
+        to:
+          - state: wait_accept
+            condition:
+              type: message
+              message: request
+              quorum: 1
+            response:
+              - target: nodes
+                message: propose
+            extra_tally:
+              - role: primary
+                message: accept
+                
+      - role: nodes
+        state: idle
+        to:
+          - state: wait_accept
+            condition:
+              type: message
+              message: propose
+              quorum: 1
+            response:
+              - target: nodes
+                message: accept
+            extra_tally:
+              - role: primary
+                message: accept
+      - role: nodes
+        state: wait_accept
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: accept
+              quorum: 4f + 1
+            response:
+              - target: client
+                message: reply
+          # view-change
+          - state: wait_view_change
+            update: view
+            condition:
+              type: timeout
+              mode: sequence
+            response:
+              - target: nodes
+                message: view_change
+
+      # view-change
+      - role: nodes
+        state: wait_view_change
+        to:
+          - state: wait_new_view
+            condition:
+              type: message
+              message: view_change
+              quorum: 2f + 1
+
+      - role: primary
+        state: wait_new_view
+        to:
+          - state: executed
+            update: sequence
+            response:
+              - target: nodes
+                message: new_view
+              - target: client
+                message: reply
+
+      - role: nodes
+        state: wait_new_view
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: new_view
+              quorum: 1
+            response:
+              - target: client
+                message: reply
+          - state: wait_new_view
+            update: view
+            condition:
+              type: timeout
+              mode: state

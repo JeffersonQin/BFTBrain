@@ -1,0 +1,130 @@
+plugins:
+  role: primary
+  message:
+    - digest
+    - mac
+    - checkpoint
+  transition:
+    - checkpoint
+  pipeline: direct
+
+protocol:
+  general:
+    leader: rotate
+    request-target: primary
+
+  roles:
+    - primary
+    - nodes
+    - client
+
+  phases:
+    - name: normal
+      states:
+        - idle
+        - wait_prepare
+        - wait_commit_primary
+        - wait_commit_all
+        - wait_decide
+        - executed
+      messages:
+        - name: request
+          request-block: true
+        - name: reply
+          request-block: true
+        - name: prepare
+          request-block: true
+        - commit
+        - decide
+
+    - name: checkpoint
+      messages:
+        - checkpoint
+
+  transitions:
+    from:
+      - role: client
+        state: idle
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: reply
+              quorum: f + 1
+
+      - role: primary
+        state: idle
+        to:
+          - state: wait_prepare
+            condition:
+              type: message
+              message: request
+              quorum: 1
+            response:
+              - target: nodes
+                message: prepare
+
+      - role: nodes
+        state: idle
+        to:
+          - state: wait_commit_all
+            condition:
+              type: message
+              message: prepare
+              quorum: 1
+            response:
+              - target: primary
+                message: prepare
+
+      - role: primary
+        state: wait_prepare
+        to:
+          - state: wait_commit_primary
+            condition:
+              type: message
+              message: prepare
+              quorum: 2f + 1
+            response:
+              - target: nodes
+                message: commit
+
+      - role: nodes
+        state: wait_commit_all
+        to:
+          - state: wait_decide
+            condition:
+              type: message
+              message: commit
+              quorum: 1
+            response:
+              - target: primary
+                message: commit
+
+      - role: primary
+        state: wait_commit_primary
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: commit
+              quorum: 2f + 1
+            response:
+              - target: nodes
+                message: decide
+              - target: client
+                message: reply
+
+      - role: nodes
+        state: wait_decide
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: decide
+              quorum: 1
+            response:
+              - target: client
+                message: reply

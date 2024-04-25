@@ -1,0 +1,160 @@
+plugins:
+  role: primary
+  message:
+    - digest
+    - mac
+    - checkpoint
+  transition:
+    - checkpoint
+  pipeline: direct
+
+protocol:
+  fault-override:
+    - slow-proposal
+
+  general:
+    leader: stable
+    request-target: primary
+    aggregation: true
+
+  roles:
+    - primary
+    - nodes
+    - client
+
+  phases:
+    - name: normal
+      states:
+        - idle
+        - wait_po_ack
+        - wait_po_summary
+        - wait_prepare
+        - wait_commit
+        - executed
+      messages:
+        - name: request
+          request-block: true
+        - name: reply
+          request-block: true
+        - name: po-request
+          request-block: true
+        - po-ack
+        - po-summary
+        - preprepare
+        - prepare
+        - commit
+    - name: checkpoint
+      messages:
+        - checkpoint
+
+  transitions:
+    from:
+      - role: client
+        state: idle
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: reply
+              quorum: f + 1
+
+      - role: primary
+        state: idle
+        to:
+          - state: wait_po_ack
+            condition:
+              type: message
+              message: request
+              quorum: 1
+            response:
+              - target: nodes
+                message: po-request
+            extra_tally:
+              - role: primary
+                message: po-ack
+      
+      - role: nodes
+        state: idle
+        to:
+          - state: wait_po_ack
+            condition:
+              type: message
+              message: po-request
+              quorum: 1
+            response:
+              - target: nodes
+                message: po-ack
+            extra_tally:
+              - role: primary
+                message: po-ack
+
+      - role: nodes
+        state: wait_po_ack
+        to:
+          - state: wait_po_summary
+            condition:
+              type: message
+              message: po-ack
+              quorum: 2f + 1
+            response:
+              - target: nodes
+                message: po-summary
+      
+      - role: primary
+        state: wait_po_summary
+        to:
+          - state: wait_prepare
+            update: aggregation 
+            condition:
+              type: message
+              message: po-summary
+              quorum: 2f + 1
+            response:
+              - target: nodes
+                message: preprepare
+            extra_tally:
+              - role: primary
+                message: prepare
+
+      - role: nodes
+        state: wait_po_summary
+        to:
+          - state: wait_prepare
+            condition:
+              type: message
+              message: preprepare
+              quorum: 1
+            response:
+              - target: nodes
+                message: preprepare
+              - target: nodes
+                message: prepare
+            extra_tally:
+              - role: primary
+                message: prepare
+
+      - role: nodes
+        state: wait_prepare
+        to:
+          - state: wait_commit
+            condition:
+              type: message
+              message: prepare
+              quorum: 2f + 1
+            response:
+              - target: nodes
+                message: commit
+
+      - role: nodes
+        state: wait_commit
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: commit
+              quorum: 2f + 1
+            response:
+              - target: client
+                message: reply

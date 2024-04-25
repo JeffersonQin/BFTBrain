@@ -1,0 +1,200 @@
+plugins:
+  role: qc-primary
+  message:
+    - digest
+    - mac
+    - checkpoint
+  transition:
+    - checkpoint
+  pipeline: qc-pipeline
+
+protocol:
+  general:
+    leader: rotate
+    request-target: primary
+
+  roles:
+    - primary
+    - primary2
+    - primary3
+    - primary4
+    - nodes
+    - client
+
+  phases:
+    - name: normal
+      states:
+        - idle
+        - wait_prepare
+        - wait_precommit_primary
+        - wait_precommit_all
+        - wait_commit_primary
+        - wait_commit_all
+        - wait_decide
+        - executed
+
+      messages:
+        - name: request
+          request-block: true
+        - name: reply
+          request-block: true
+        - name: prepare
+          request-block: true
+        - precommit
+        - commit
+        - decide
+        - qc
+        - qc2
+        - qc3
+
+    - name: checkpoint
+      messages:
+        - checkpoint
+
+  transitions:
+    from:
+      - role: client
+        state: idle
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: reply
+              quorum: f + 1
+
+      - role: primary
+        state: idle
+        to:
+          - state: wait_prepare
+            condition:
+              type: message
+              message: request
+              quorum: 1
+            response:
+              - target: nodes
+                message: prepare
+
+      - role: nodes
+        state: idle
+        to:
+          - state: wait_precommit_all
+            condition:
+              type: message
+              message: prepare
+              quorum: 1
+            response:
+              - target: primary
+                message: prepare
+
+      - role: primary
+        state: wait_prepare
+        to:
+          - state: wait_precommit_all
+            condition:
+              type: message
+              message: prepare
+              quorum: 2f + 1
+            response:
+              - target: primary2
+                message: qc
+
+      - role: primary2
+        state: wait_precommit_all
+        to:
+          - state: wait_precommit_primary
+            condition:
+              type: message
+              message: qc
+              quorum: 1
+            response:
+              - target: nodes
+                message: precommit
+
+      - role: nodes
+        state: wait_precommit_all
+        to:
+          - state: wait_commit_all
+            condition:
+              type: message
+              message: precommit
+              quorum: 1
+            response:
+              - target: primary2
+                message: precommit
+
+      - role: primary2
+        state: wait_precommit_primary
+        to:
+          - state: wait_commit_all
+            condition:
+              type: message
+              message: precommit
+              quorum: 2f + 1
+            response:
+              - target: primary3
+                message: qc2
+
+      - role: primary3
+        state: wait_commit_all
+        to:
+          - state: wait_commit_primary
+            condition:
+              type: message
+              message: qc2
+              quorum: 1
+            response:
+              - target: nodes
+                message: commit
+
+      - role: nodes
+        state: wait_commit_all
+        to:
+          - state: wait_decide
+            condition:
+              type: message
+              message: commit
+              quorum: 1
+            response:
+              - target: primary3
+                message: commit
+
+      - role: primary3
+        state: wait_commit_primary
+        to:
+          - state: wait_decide
+            condition:
+              type: message
+              message: commit
+              quorum: 2f + 1
+            response:
+              - target: primary4
+                message: qc3
+
+      - role: primary4
+        state: wait_decide
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: qc3
+              quorum: 1
+            response:
+              - target: nodes
+                message: decide
+              - target: client
+                message: reply
+
+      - role: nodes
+        state: wait_decide
+        to:
+          - state: executed
+            update: sequence
+            condition:
+              type: message
+              message: decide
+              quorum: 1
+            response:
+              - target: client
+                message: reply
