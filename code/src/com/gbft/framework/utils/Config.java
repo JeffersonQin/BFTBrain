@@ -90,4 +90,7 @@ public class Config {
         return configs.get(currentProtocol).bool(property);
     }
 
+    public static Map<String, Object> getCurrentCache() {
+        return configs.get(currentProtocol).getCache();
+    }
 }

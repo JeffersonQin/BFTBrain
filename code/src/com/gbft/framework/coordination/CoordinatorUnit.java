@@ -31,6 +31,8 @@ import com.gbft.framework.data.MessageData;
 import com.gbft.framework.data.ReportData;
 import com.gbft.framework.data.ReportData.ReportItem;
 import com.gbft.framework.data.UnitData;
+import com.gbft.framework.demo.DemoDataUtil;
+import com.gbft.framework.demo.MetricsDataItem;
 import com.gbft.framework.plugins.InitializablePluginInterface;
 import com.gbft.framework.plugins.PluginManager;
 import com.gbft.framework.statemachine.StateMachine;
@@ -177,6 +179,16 @@ public class CoordinatorUnit extends CoordinatorBase {
                 var item = ReportItem.newBuilder().putAllItemData(map).build();
                 var name = (entities.get(id).isClient() ? "Client " : "Node ") + id;
                 reportData.putReportData(name, item);
+
+                // send this metrics (map) to demo backend server
+                for (var entry : map.entrySet()) {
+                    var metricsDataItem = new MetricsDataItem(entry.getKey(), entry.getValue(), id);
+                    if (Config.bool("demo.enabled")) {
+                        new Thread(() -> {
+                            DemoDataUtil.putMetrics(metricsDataItem);
+                        }).start();
+                    }
+                }
             }
             // var map = reportBenchmark();
             // var item = ReportItem.newBuilder().putAllItemData(map).build();

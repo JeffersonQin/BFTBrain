@@ -214,4 +214,8 @@ public class ConfigObject {
 
         return null;
     }
+
+    public Map<String, Object> getCache() {
+        return cache;
+    }
 }

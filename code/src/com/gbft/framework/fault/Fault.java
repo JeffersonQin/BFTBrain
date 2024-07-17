@@ -6,7 +6,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import com.gbft.framework.utils.Config;
 
 public abstract class Fault {
-    private List<Integer> affectedEntities;
 
     protected String policyName;
 
@@ -18,8 +17,6 @@ public abstract class Fault {
 
     public Fault(String policyName) {
         this.policyName = policyName;
-        // default settings at warm-up phase
-        this.affectedEntities = Config.intList(getField("affected-entities"));
 
         // check if is overridden
         this.isOverridden = new AtomicBoolean(false);
@@ -44,6 +41,6 @@ public abstract class Fault {
     }
 
     public List<Integer> getAffectedEntities() {
-        return this.affectedEntities;
+        return Config.intList(getField("affected-entities"));
     }
 }

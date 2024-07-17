@@ -1,0 +1,49 @@
+configurations:
+  - group: Fault
+    fields:
+      - desc: Non-responsive Nodes (IDs seperated by ",")
+        key: fault.in-dark.affected-entities
+        type: int_list
+        value: 1
+      - desc: In-dark - enabled
+        key: fault.in-dark.generator
+        type: boolean
+        value: False
+      - desc: Slow proposal Nodes (IDs seperated by ",")
+        key: fault.slow-proposal.affected-entities
+        type: int_list
+        value: 0
+      - desc: Slowness of proposal in milliseconds
+        key: fault.slow-proposal.timer
+        type: int
+        value: 0
+  - group: Workload
+    fields:
+      - desc: Contention Level (lower is larger)
+        key: workload.contention-level
+        type: int
+        value: 100
+      - desc: Dataset Size
+        key: workload.dataset-size
+        type: int
+        value: 100
+      - desc: Request Size (B)
+        key: workload.payload.request-size
+        type: int
+        value: 1000000
+      - desc: Reply Size (B)
+        key: workload.payload.reply-size
+        type: int
+        value: 1000000
+      - desc: Compute Factor
+        key: workload.compute-factor
+        type: int
+        value: 0
+      - desc: Workload Ratio for (0/0, 0/4, 4/0, 4/4) (Add up to 1, seperated by ",")
+        key: workload.distribution
+        type: double_list
+        value: 1,0,0,0
+      - desc: Read-only Ratio
+        key: workload.read-only-ratio
+        type: double
+        value: 0

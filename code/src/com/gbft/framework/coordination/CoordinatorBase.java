@@ -18,9 +18,12 @@ import org.apache.commons.lang3.tuple.Pair;
 
 import com.gbft.framework.data.Event;
 import com.gbft.framework.data.Event.EventType;
+import com.gbft.framework.demo.DemoDataUtil;
+import com.gbft.framework.demo.SettingPatcherField;
 import com.gbft.framework.statemachine.StateMachine;
 import com.gbft.framework.utils.AdvanceConfig;
 import com.gbft.framework.utils.Config;
+import com.google.gson.Gson;
 
 public abstract class CoordinatorBase {
     protected static final int SERVER = -1;
@@ -51,6 +54,46 @@ public abstract class CoordinatorBase {
         try {
             Config.load(yamlData, defaultProtocol);
             AdvanceConfig.load(yamlData.get("framework"));
+            if (Config.bool("demo.enabled")) {
+                Gson gson = new Gson();
+                new Thread(() -> {
+                    var last_config = "";
+                    while (true) {
+                        try {
+                            Thread.sleep(Config.integer("demo.update_interval_ms"));
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        // pull data from server
+                        var this_unit_id = 0;
+                        if (this instanceof CoordinatorServer) {
+                            this_unit_id = 0;
+                        } else if (this instanceof CoordinatorUnit) {
+                            this_unit_id = ((CoordinatorUnit) this).unit_id + 1;
+                        } else {
+                            System.out.println("[!!!] Unknown coordinator type.");
+                            System.exit(1);
+                        }
+                        var demo_config = DemoDataUtil.getConfig(this_unit_id);
+
+                        // check if same as last time
+                        if (demo_config.equals(last_config)) {
+                            continue;
+                        }
+                        last_config = demo_config;
+
+                        // convert from json to SettingPatcherField[]
+                        var config_patches = gson.fromJson(demo_config, SettingPatcherField[].class);
+                        // update config cache
+                        for (var patch : config_patches) {
+                            System.out.println("Update config: " + patch.getKey() + " = " + patch.getValue() + " (" + patch.getType() + ")");
+                            Config.getCurrentCache().put(patch.getKey(), patch.getValue());
+                        }
+
+                        System.out.println("Demo config updated. (" + config_patches.length + ")");
+                    }
+                }).start();
+            }
         } catch (IOException e) {
             System.err.println("Error loading config.");
             System.exit(1);
