@@ -1,4 +1,4 @@
-# AdaptiveBedrock
+# BFTBrain
 
 ## Mode 1 - No switching
 
