@@ -59,6 +59,8 @@ class Dumper(yaml.Dumper):
 
 def update_config_file(updated_data):
     yaml.dump(updated_data, open(os.path.join(root_dir, "default-updated.yaml"), "w"), default_flow_style=False, Dumper=Dumper)
+
+update_config_file(data)
 # ===============================================================================
 
 
