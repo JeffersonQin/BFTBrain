@@ -159,7 +159,7 @@ def deploy_single_worker(worker_node):
                 "22",
                 "-o",
                 "StrictHostKeyChecking no",
-                "wget -O - https://gist.githubusercontent.com/JeffersonQin/04ddbb70868010b781e50527cc92c168/raw/ee1fa45998ebcf815714b63180a50e793adf7f05/BFTBrain-deploy.sh > setup.sh && " + 
+                "wget -O - https://gist.githubusercontent.com/JeffersonQin/04ddbb70868010b781e50527cc92c168/raw/40f9fe94ec56b03503c80b2167b134afbfb41691/BFTBrain-deploy.sh > setup.sh && " + 
                 "chmod +x setup.sh && source setup.sh &> setup.log"
             ], 
             stdout = subprocess.DEVNULL,
